@@ -86,6 +86,8 @@ private:
     QTableView *familyTable;
     QPushButton *manageFamily_AddButton;
     QPushButton *manageFamily_DelButton;
+    QPushButton *manageFamily_SubmitButton;
+    QPushButton *manageFamily_RevertButton;
 
     //management ManageVisitation visit
     QSqlRelationalTableModel *manageVisit_Model;
@@ -93,6 +95,9 @@ private:
     QTableView *visitTable;
     QPushButton *manageVisit_AddButton;
     QPushButton *manageVisit_DelButton;
+    QPushButton *manageVisit_SubmitButton;
+    QPushButton *manageVisit_RevertButton;
+
 
 private slots:
     //mangement
@@ -104,10 +109,12 @@ private slots:
     void slot_ManageFamily(bool val);
     void slot_ManageFamily_AddButton(bool val);
     void slot_ManageFamily_DelButton(bool val);
+    void slot_ManageFamily_SubmitButton(bool val);
 
-    void slot_ManageVisits(bool val);
-    void slot_ManageVisits_AddButton(bool val);
+    void slot_ManageVisit(bool val);
+    void slot_ManageVisit_AddButton(bool val);
     void slot_ManageVisit_DelButton(bool val);
+    void slot_ManageVisit_SubmitButton(bool val);
 
     void slot_runQueryAction(bool val);
 

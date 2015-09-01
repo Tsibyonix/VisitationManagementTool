@@ -76,7 +76,7 @@ void MainWindow::init_ConnectActions()
     this->connect(ui->actionRun_Query, SIGNAL(triggered(bool)), this, SLOT(slot_runQueryAction(bool)));
     this->connect(ui->actionMange_Cells, SIGNAL(triggered(bool)), this, SLOT(slot_ManageCells(bool)));
     this->connect(ui->actionManage_Families, SIGNAL(triggered(bool)), this, SLOT(slot_ManageFamily(bool)));
-    this->connect(ui->actionManage_Visits, SIGNAL(triggered(bool)), this, SLOT(slot_ManageVisits(bool)));
+    this->connect(ui->actionManage_Visits, SIGNAL(triggered(bool)), this, SLOT(slot_ManageVisit(bool)));
     //
     this->connect(ui->tabWidget, SIGNAL(tabCloseRequested(int)), this, SLOT(closeTab(int)));
 }
@@ -255,12 +255,15 @@ void MainWindow::manageFamily_RefreshTable()
 {
     manageFamily_Model = new QSqlRelationalTableModel;
     manageFamily_Model->setTable("family_id");
+    manageFamily_Model->setSort(1, Qt::AscendingOrder);
     manageFamily_Model->select();
     manageFamily_Model->setHeaderData(0, Qt::Horizontal, "Family Name");
     manageFamily_Model->setHeaderData(1, Qt::Horizontal, "Cell Number");
-    manageFamily_Model->setEditStrategy(QSqlTableModel::OnFieldChange);
+    manageFamily_Model->setEditStrategy(QSqlTableModel::OnManualSubmit);
     familyTable->setModel(manageFamily_Model);
 
+    familyTable->sortByColumn(1, Qt::AscendingOrder);
+    familyTable->setSortingEnabled(true);
     manageFamily_Model->setRelation(1, QSqlRelation("cell_id", "id", "id"));
     familyTable->setItemDelegate(new QSqlRelationalDelegate(familyTable));
 }
@@ -271,6 +274,10 @@ void MainWindow::slot_ManageFamily(bool val)
     tabWidget = new QWidget();
     QHBoxLayout *hBoxLayout;                //var
     hBoxLayout = new QHBoxLayout(this);
+    manageFamily_SubmitButton = new QPushButton("Submit", this);
+    hBoxLayout->addWidget(manageFamily_SubmitButton);
+    manageFamily_RevertButton = new QPushButton("Revert", this);
+    hBoxLayout->addWidget(manageFamily_RevertButton);
     hBoxLayout->addSpacerItem(new QSpacerItem(200, 15, QSizePolicy::Expanding));
     manageFamily_AddButton = new QPushButton("add", this);
     manageFamily_AddButton->setMaximumWidth(30);
@@ -293,11 +300,12 @@ void MainWindow::slot_ManageFamily(bool val)
     //signal and slots
     this->connect(manageFamily_AddButton, SIGNAL(clicked(bool)), this, SLOT(slot_ManageFamily_AddButton(bool)));
     this->connect(manageFamily_DelButton, SIGNAL(clicked(bool)), this, SLOT(slot_ManageFamily_DelButton(bool)));
+    this->connect(manageFamily_SubmitButton, SIGNAL(clicked(bool)), this, SLOT(slot_ManageFamily_SubmitButton(bool)));
+    this->connect(manageFamily_RevertButton, SIGNAL(clicked(bool)), manageFamily_Model, SLOT(revertAll()));
 }
 
 void MainWindow::slot_ManageFamily_AddButton(bool val)
 {
-    bool insert;
     QSqlRecord sqlRecord;
     QSqlField family("family", QVariant::String);
     QSqlField id("id", QVariant::Int);
@@ -305,40 +313,69 @@ void MainWindow::slot_ManageFamily_AddButton(bool val)
     id.setValue(QVariant(""));
     sqlRecord.append(family);
     sqlRecord.append(id);
-    manageFamily_Model = new QSqlRelationalTableModel;
-    manageFamily_Model->setTable("Family_id");
-    insert = manageFamily_Model->insertRecord(-1, sqlRecord);
-    if(insert == false)
-    {
-        showMessage("Error occured while adding new record", 2000);
-        //showMessage(ma);
-    }
-    manageFamily_RefreshTable();
+    manageFamily_Model->insertRecord(-1, sqlRecord);
 }
 
 void MainWindow::slot_ManageFamily_DelButton(bool val)
 {
+    QModelIndex index;
+    int row = -1;
+    index = familyTable->currentIndex();
+    row = index.row();
+    if(index.isValid())
+    {
+        showMessage("Deleting row number "+QString::number(row + 1)+"", 6000);
+        QString temp = index.sibling(row, 1).data().toString();
+        manageFamily_Model->removeRow(index.row());
+        manageFamily_Model->submit();
+    }
+    else
+        showMessage("Select the row you want to delete", 6000);
+}
 
+void MainWindow::slot_ManageFamily_SubmitButton(bool val)
+{
+    showMessage("Submit Clicked", 6000);
+    manageFamily_Model->database().transaction();
+    if(manageFamily_Model->submitAll())
+    {
+        manageFamily_Model->database().commit();
+        qDebug() << "Changes are commited";
+    }
+    else
+    {
+        qDebug() << "Rollback";
+        manageFamily_Model->database().rollback();
+        QMessageBox::warning(this, "Edit Error",
+                             manageFamily_Model->lastError().text());
+    }
 }
 
 void MainWindow::manageVisit_RefreshTable()
 {
     manageVisit_Model = new QSqlRelationalTableModel;
     manageVisit_Model->setTable("visit");
+    manageVisit_Model->setSort(1, Qt::AscendingOrder);
     manageVisit_Model->select();
-
-    manageVisit_Model->setEditStrategy(QSqlTableModel::OnFieldChange);
+    manageVisit_Model->setEditStrategy(QSqlTableModel::OnManualSubmit);
     visitTable->setModel(manageVisit_Model);
+
+    visitTable->sortByColumn(1, Qt::AscendingOrder);
+    visitTable->setSortingEnabled(true);
     manageVisit_Model->setRelation(0, QSqlRelation("family_id", "family", "family"));
     visitTable->setItemDelegate(new QSqlRelationalDelegate(visitTable));
 }
 
-void MainWindow::slot_ManageVisits(bool val)
+void MainWindow::slot_ManageVisit(bool val)
 {
     QWidget *tabWidget;                     //var
     tabWidget = new QWidget();
     QHBoxLayout *hBoxLayout;                //var
     hBoxLayout = new QHBoxLayout(this);
+    manageVisit_SubmitButton = new QPushButton("Submit", this);
+    hBoxLayout->addWidget(manageVisit_SubmitButton);
+    manageVisit_RevertButton = new QPushButton("Revert", this);
+    hBoxLayout->addWidget(manageVisit_RevertButton);
     hBoxLayout->addSpacerItem(new QSpacerItem(200, 15, QSizePolicy::Expanding));
     manageVisit_AddButton = new QPushButton("add", this);
     manageVisit_AddButton->setMaximumWidth(30);
@@ -357,16 +394,65 @@ void MainWindow::slot_ManageVisits(bool val)
 
     manageVisit_RefreshTable();
     visitTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+
+    //signal and slots
+    this->connect(manageVisit_AddButton, SIGNAL(clicked(bool)), this, SLOT(slot_ManageVisit_AddButton(bool)));
+    this->connect(manageVisit_DelButton, SIGNAL(clicked(bool)), this, SLOT(slot_ManageVisit_DelButton(bool)));
+    this->connect(manageVisit_SubmitButton, SIGNAL(clicked(bool)), this, SLOT(slot_ManageVisit_SubmitButton(bool)));
+    this->connect(manageVisit_RevertButton, SIGNAL(clicked(bool)), manageVisit_Model, SLOT(revertAll()));
 }
 
-void MainWindow::slot_ManageVisits_AddButton(bool val)
+void MainWindow::slot_ManageVisit_AddButton(bool val)
 {
-
+    QSqlRecord sqlRecord;
+    QSqlField visitTo("visit_to", QVariant::String);
+    QSqlField visitBy("visit_by", QVariant::Int);
+    QSqlField date("date", QVariant::String);
+    QSqlField comments("comments", QVariant::String);
+    visitTo.setValue(QVariant(""));
+    visitBy.setValue(QVariant(""));
+    date.setValue(QVariant(""));
+    comments.setValue(QVariant(""));
+    sqlRecord.append(visitTo);
+    sqlRecord.append(visitBy);
+    sqlRecord.append(date);
+    sqlRecord.append(comments);
+    manageVisit_Model->insertRecord(-1, sqlRecord);
 }
 
 void MainWindow::slot_ManageVisit_DelButton(bool val)
 {
+    QModelIndex index;
+    int row = -1;
+    index = visitTable->currentIndex();
+    row = index.row();
+    if(index.isValid())
+    {
+        showMessage("Deleting row number "+QString::number(row + 1)+"", 6000);
+        QString temp = index.sibling(row, 1).data().toString();
+        manageVisit_Model->removeRow(index.row());
+        manageVisit_Model->submit();
+    }
+    else
+        showMessage("Select the row you want to delete", 6000);
+}
 
+void MainWindow::slot_ManageVisit_SubmitButton(bool val)
+{
+    showMessage("Submit Clicked", 6000);
+    manageVisit_Model->database().transaction();
+    if(manageVisit_Model->submitAll())
+    {
+        manageVisit_Model->database().commit();
+        qDebug() << "Changes are commited";
+    }
+    else
+    {
+        qDebug() << "Rollback";
+        manageVisit_Model->database().rollback();
+        QMessageBox::warning(this, "Edit Error",
+                             manageVisit_Model->lastError().text());
+    }
 }
 
 void MainWindow::keyPressEvent(QKeyEvent *keyEvent)
