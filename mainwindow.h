@@ -99,7 +99,6 @@ private slots:
     void slot_ManageCells(bool val);
     void slot_ManageCells_AddButtonPress(bool val);
     void slot_ManageCells_DelButtonPress(bool val);
-    void slot_ManageCells_UpdateTable(QModelIndex,QModelIndex,QVector<int>);
     void slot_ManageCell_SubmitButton(bool val);
 
     void slot_ManageFamily(bool val);

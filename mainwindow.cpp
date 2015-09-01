@@ -1,5 +1,3 @@
-
-
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
@@ -17,8 +15,6 @@ MainWindow::MainWindow(QWidget *parent) :
     init_LoadDatabase();
     //getCells();
 
-    manageCell_Model = new QSqlTableModel(this);
-    this->connect(manageCell_Model, SIGNAL(dataChanged(QModelIndex,QModelIndex,QVector<int>)), this, SLOT(slot_ManageCells_UpdateTable(QModelIndex,QModelIndex,QVector<int>)));
     //variables
 }
 
@@ -167,35 +163,14 @@ void MainWindow::manageCell_RefreshTable()
     manageCell_Model->setHeaderData(0, Qt::Horizontal, "Cells");
     manageCell_Model->setHeaderData(1, Qt::Horizontal, "ID");
     manageCell_Model->setEditStrategy(QSqlTableModel::OnManualSubmit);
-    if(doSubmit == true)
-    {
-        manageCell_Model->database().transaction();
-        if(manageCell_Model->submitAll())
-        {
-            manageCell_Model->database().commit();
-            qDebug() << "Changes are commited";
-        }
-        else
-        {
-            qDebug() << "Rollback";
-            manageCell_Model->database().rollback();
-            QMessageBox::warning(this, "Edit Error",
-                                 manageCell_Model->lastError().text());
-        }
-    }
     cellTable->setModel(manageCell_Model);
     cellTable->sortByColumn(1, Qt::AscendingOrder);
     cellTable->setSortingEnabled(true);
 }
 
-void MainWindow::slot_ManageCells_UpdateTable(QModelIndex, QModelIndex, QVector<int>)
-{
-    manageCell_RefreshTable();
-}
-
 void MainWindow::slot_ManageCells(bool val)
 {
-    QWidget *tabWidget;                     //vaer
+    QWidget *tabWidget;                     //var
     tabWidget = new QWidget();
     QHBoxLayout *hBoxLayout;                //var
     hBoxLayout = new QHBoxLayout(this);
@@ -225,11 +200,12 @@ void MainWindow::slot_ManageCells(bool val)
     this->connect(addButton, SIGNAL(clicked(bool)), this, SLOT(slot_ManageCells_AddButtonPress(bool)));
     this->connect(deleteButton, SIGNAL(clicked(bool)), this, SLOT(slot_ManageCells_DelButtonPress(bool)));
     this->connect(manageCell_SubmitButton, SIGNAL(clicked(bool)), this, SLOT(slot_ManageCell_SubmitButton(bool)));
+    this->connect(manageCell_RevertButton, SIGNAL(clicked(bool)), manageCell_Model, SLOT(revertAll()));
 }
 
 void MainWindow::slot_ManageCells_AddButtonPress(bool val)
 {
-    bool insert;
+    showMessage("Add pressed", 4000);
     QSqlRecord sqlRecord;
     QSqlField cell("cell", QVariant::String);
     QSqlField id("id", QVariant::Int);
@@ -237,25 +213,7 @@ void MainWindow::slot_ManageCells_AddButtonPress(bool val)
     id.setValue(QVariant(""));
     sqlRecord.append(cell);
     sqlRecord.append(id);
-    manageCell_Model = new QSqlTableModel(this);
-    manageCell_Model->setTable("cell_id");
-    insert = manageCell_Model->insertRecord(-1, sqlRecord);
-    if(insert == false)
-    {
-        showMessage("Error occured while adding new record", 2000);
-    }
-    doSubmit = true;
-    manageCell_RefreshTable();
-    //QSqlQuery qry;
-    //qry.prepare("insert into cell_id values ('', '')");
-    //qry.exec();
-    //if(!qry.exec())
-    //    QMessageBox::warning(this, "Error", qry.lastError().text());
-    //else
-    //{
-    //    manageCell_RefreshTable();
-    //    showMessage("Add Button Pressed", 6000);
-    //}
+    manageCell_Model->insertRecord(-1, sqlRecord);
 }
 
 void MainWindow::slot_ManageCells_DelButtonPress(bool val)
@@ -268,13 +226,8 @@ void MainWindow::slot_ManageCells_DelButtonPress(bool val)
     {
         showMessage("Deleting row number "+QString::number(row + 1)+"", 6000);
         QString temp = index.sibling(row, 1).data().toString();
-        QSqlQuery qry("delete from cell_id where id='"+temp+"'");
-        //if(!qry.exec())
-        //    QMessageBox::warning(this, "Error", qry.lastError().text());
-        //else
-        //{
-        //    manageCell_RefreshTable();
-        //}
+        manageCell_Model->removeRow(index.row());
+        manageCell_Model->submit();
     }
     else
         showMessage("Select the row you want to delete", 6000);
@@ -283,14 +236,19 @@ void MainWindow::slot_ManageCells_DelButtonPress(bool val)
 void MainWindow::slot_ManageCell_SubmitButton(bool val)
 {
     showMessage("Submit Clicked", 6000);
-//    manageCell_Model = new QSqlTableModel;
-//    manageCell_Model->setTable("cell_id");
-//    manageCell_Model->select();
-//    manageCell_Model->setEditStrategy(QSqlTableModel::OnManualSubmit);
-    doSubmit == true;
-    manageCell_RefreshTable();
-
-
+    manageCell_Model->database().transaction();
+    if(manageCell_Model->submitAll())
+    {
+        manageCell_Model->database().commit();
+        qDebug() << "Changes are commited";
+    }
+    else
+    {
+        qDebug() << "Rollback";
+        manageCell_Model->database().rollback();
+        QMessageBox::warning(this, "Edit Error",
+                             manageCell_Model->lastError().text());
+    }
 }
 
 void MainWindow::manageFamily_RefreshTable()
