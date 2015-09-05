@@ -6,15 +6,16 @@ MainWindow::MainWindow(QWidget *parent) :
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-
+    setWindowTitle("Visitation Management Tool");
     ui->tabWidget->setTabsClosable(true);
-
+    updates = false;
     qDebug() << "Loading saved settings";
     loadSettings();
     init_ConnectActions();
     init_LoadDatabase();
-    //getCells();
-
+    patchDownload = false;
+    checkForUpdate();
+    //readXML();
     //variables
 }
 
@@ -24,6 +25,7 @@ MainWindow::~MainWindow()
     saveSettings();
     qDebug() << "Saving settings from current session";
     loadDatabase.close();
+    //file->close();
     delete ui;
 }
 
@@ -77,6 +79,7 @@ void MainWindow::init_ConnectActions()
     this->connect(ui->actionMange_Cells, SIGNAL(triggered(bool)), this, SLOT(slot_ManageCells(bool)));
     this->connect(ui->actionManage_Families, SIGNAL(triggered(bool)), this, SLOT(slot_ManageFamily(bool)));
     this->connect(ui->actionManage_Visits, SIGNAL(triggered(bool)), this, SLOT(slot_ManageVisit(bool)));
+    this->connect(ui->actionCheck_for_Updates, SIGNAL(triggered(bool)), this, SLOT(doUpdate()));
     //
     this->connect(ui->tabWidget, SIGNAL(tabCloseRequested(int)), this, SLOT(closeTab(int)));
 }
@@ -87,6 +90,155 @@ void MainWindow::showMessage(QString msg, int time)
         ui->statusBar->showMessage(msg);
     else
         ui->statusBar->showMessage(msg, time);
+}
+
+void MainWindow::checkForUpdate()
+{
+    downloadFile("http://tsibyonixo.scrapmyemail.tntrg.com/visitationmanagementtool/version.xml", true);
+}
+
+void MainWindow::downloadFile(QString link, bool progressDialog)
+{
+    url.setUrl(link);
+    QFileInfo fileInfo(url.path());
+
+    QString fileName = fileInfo.fileName();
+    if (fileName.isEmpty())
+        fileName = "index.html";
+
+    if (QFile::exists(fileName))
+        QFile::remove(fileName);
+
+    file = new QFile(fileName);
+    if (!file->open(QIODevice::WriteOnly)) {
+        file->close();
+        delete file;
+    }
+
+    startRequest(url);
+}
+
+void MainWindow::startRequest(QUrl url)
+{
+    reply = qnam.get(QNetworkRequest(url));
+    connect(reply, SIGNAL(finished()),
+            this, SLOT(slot_Finished()));
+    connect(reply, SIGNAL(readyRead()),
+            this, SLOT(slot_ReadRead()));
+    connect(reply, SIGNAL(downloadProgress(qint64,qint64)),
+            this, SLOT(slot_Progress(qint64,qint64)));
+}
+
+void MainWindow::slot_ReadRead()
+{
+    if (file)
+        file->write(reply->readAll());
+}
+
+void MainWindow::slot_Finished()
+{
+    QVariant redirectionTarget = reply->attribute(QNetworkRequest::RedirectionTargetAttribute);
+    if (reply->error()) {
+        showMessage("Server returned 404, file not found", 6000);
+        file->remove();
+        file->close();
+    } else if (!redirectionTarget.isNull()) {
+        QUrl newUrl = url.resolved(redirectionTarget.toUrl());
+        file->close();
+    } else {
+        if(patchDownload) {
+            reply->deleteLater();
+            file->close();
+        }
+        else {
+            reply->deleteLater();
+            file->close();
+            qDebug() << "Reading XML file";
+            readXML();
+        }
+    }
+}
+
+void MainWindow::slot_Progress(qint64 bytesRead, qint64 totalBytes)
+{
+    float time;
+    QString format = "minutes";
+    float kbRamaining;
+    qint64 kbRead = bytesRead/(1024*1024);
+    speed = (bytesRead/1024) - last;
+    last = bytesRead/1024;
+    kbRamaining = (totalBytes - bytesRead) / 1024;
+    time = (kbRamaining/speed)/60;
+    if(time > 60) {
+        format = "hours";
+        time = time/60;
+    }
+    //speed
+    qint64 kbtotal = totalBytes/(1024*1024);
+    if(kbRead != kbtotal)
+        showMessage(tr("Downloading file %1, current progress: %2 MiB/ %3 MiB, @%4 KiB/iteration, Etimated time remaining: %5 %6")
+                    .arg(QFileInfo(url.path()).fileName())
+                    .arg(QString::number(kbRead))
+                    .arg(QString::number(kbtotal))
+                    .arg(QString::number(speed))
+                    .arg(QString::number(time, 'f', 1))
+                    .arg(format), NULL);
+    else
+        showMessage("File Downloaded", 6000);
+}
+
+void MainWindow::readXML()
+{
+    qDebug() << "Parsing document";
+    QDomDocument document;
+    QFile xml("version.xml");
+    if(!xml.open(QIODevice::ReadOnly))
+        qDebug() << "Cannot open file";
+    if(!document.setContent(&xml)) {
+        qDebug() << "Unable to read document file";
+        xml.close();
+        return;
+    }
+    xml.close();
+
+    QDomElement root;
+    root = document.firstChildElement();
+
+    stable = root.firstChildElement("stable");
+    linkstable = root.firstChildElement("stablelink");
+    beta = root.firstChildElement("beta");
+    linkbeta = root.firstChildElement("betalink");
+
+    float current;
+    current = version.toFloat();
+
+    if(status.contains("stable")) {
+        if(stable.text().toFloat() > current) {
+        showMessage("New updates available", 6000);
+        updates = true;
+        } else {
+        showMessage("No new updates available", 6000);
+        }
+    } else {
+        if(beta.text().toFloat() > current) {
+        showMessage("New updates available", 6000);
+        updates = true;
+        } else {
+        showMessage("No new updates available", 6000);
+        }
+    }
+}
+
+void MainWindow::doUpdate()
+{
+    if(updates) {
+        if(status.contains("stable"))
+            downloadFile(linkstable.text(), true);
+        else
+            downloadFile(linkbeta.text(), true);
+    } else {
+        QMessageBox::warning(this, "Updates", "No updates were found", QMessageBox::Ok);
+    }
 }
 
 void MainWindow::aboutAction(bool val)
@@ -262,8 +414,6 @@ void MainWindow::manageFamily_RefreshTable()
     manageFamily_Model->setEditStrategy(QSqlTableModel::OnManualSubmit);
     familyTable->setModel(manageFamily_Model);
 
-    familyTable->sortByColumn(1, Qt::AscendingOrder);
-    familyTable->setSortingEnabled(true);
     manageFamily_Model->setRelation(1, QSqlRelation("cell_id", "id", "id"));
     familyTable->setItemDelegate(new QSqlRelationalDelegate(familyTable));
 }
@@ -360,8 +510,6 @@ void MainWindow::manageVisit_RefreshTable()
     manageVisit_Model->setEditStrategy(QSqlTableModel::OnManualSubmit);
     visitTable->setModel(manageVisit_Model);
 
-    visitTable->sortByColumn(1, Qt::AscendingOrder);
-    visitTable->setSortingEnabled(true);
     manageVisit_Model->setRelation(0, QSqlRelation("family_id", "family", "family"));
     visitTable->setItemDelegate(new QSqlRelationalDelegate(visitTable));
 }

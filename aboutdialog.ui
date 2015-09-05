@@ -6,20 +6,20 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>417</width>
-    <height>108</height>
+    <width>448</width>
+    <height>131</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Dialog</string>
   </property>
-  <widget class="QWidget" name="">
+  <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
      <x>10</x>
      <y>10</y>
-     <width>404</width>
-     <height>86</height>
+     <width>431</width>
+     <height>111</height>
     </rect>
    </property>
    <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -28,14 +28,14 @@
       <item>
        <widget class="QLabel" name="label">
         <property name="text">
-         <string>Follow Up Tool, version 0.1</string>
+         <string>Visitation Management Tool, version 0.1 beta, lisenced under MIT license.</string>
         </property>
        </widget>
       </item>
       <item>
        <widget class="QLabel" name="label_2">
         <property name="text">
-         <string>Built by 'tSibyonix'</string>
+         <string>Built by 'tSibyonixo'</string>
         </property>
        </widget>
       </item>
@@ -43,6 +43,13 @@
        <widget class="QLabel" name="label_3">
         <property name="text">
          <string>I hope this software works for you, this software comes with absolutly no warrenty</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="label_4">
+        <property name="text">
+         <string>Speacial thanks to @phoenix for hosting and repo management.</string>
         </property>
        </widget>
       </item>

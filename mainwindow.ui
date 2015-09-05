@@ -73,6 +73,7 @@
     <property name="title">
      <string>&amp;Help</string>
     </property>
+    <addaction name="actionCheck_for_Updates"/>
     <addaction name="action_About"/>
    </widget>
    <widget class="QMenu" name="menuManage">
@@ -122,6 +123,11 @@
   <action name="actionManage_Visits">
    <property name="text">
     <string>Manage &amp;Visits</string>
+   </property>
+  </action>
+  <action name="actionCheck_for_Updates">
+   <property name="text">
+    <string>Check for &amp;Updates</string>
    </property>
   </action>
  </widget>

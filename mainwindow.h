@@ -1,6 +1,9 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+//#define APP_VERSION 0.1
+//#define APP_STATUS beta
+
 #include <QMainWindow>
 #include <QtGui>
 #include <QtCore>
@@ -27,6 +30,13 @@
 #include <QProgressDialog>
 #include <QMessageBox>
 
+#include <QtNetwork>
+#include <QUrl>
+#include <QNetworkAccessManager>
+#include <QFileInfo>
+#include <QFile>
+#include <QtXml>
+
 #include "loaddatabase.h"
 #include "aboutdialog.h"
 #include "runquerydialog.h"
@@ -46,6 +56,9 @@ public:
     
 private:
     Ui::MainWindow *ui;
+
+    QString status = "beta";
+    QString version = "0.1";
 
     //init
     void init_ConnectActions();
@@ -98,6 +111,25 @@ private:
     QPushButton *manageVisit_SubmitButton;
     QPushButton *manageVisit_RevertButton;
 
+    void downloadFile(QString link, bool progressDialog);
+    void startRequest(QUrl url);
+    QUrl url;
+    QNetworkAccessManager qnam;
+    QNetworkReply *reply;
+    QFile *file;
+    bool patchDownload;
+    bool updates;
+
+    QDomElement stable;
+    QDomElement linkstable;
+    QDomElement beta;
+    QDomElement linkbeta;
+
+    void checkForUpdate();
+    void readXML();
+
+    qint64 speed = 0;
+    qint64 last = 0;
 
 private slots:
     //mangement
@@ -118,17 +150,25 @@ private slots:
 
     void slot_runQueryAction(bool val);
 
+    void slot_ReadRead();
+    void slot_Finished();
+    void slot_Progress(qint64 bytesRead, qint64 totalBytes);
+
 public slots:
     void errorToStatusbar(QString err);
 
     //actions
     void aboutAction(bool val);
+    void doUpdate();
 
     //
     void closeTab(int index);
 
 protected:
     //00bool QSqlTableModel::insertRowIntoTable(const QSqlRecord &values);
+
+signals:
+    void linkReceived(QString link);
 };
 
 #endif // MAINWINDOW_H
