@@ -12,7 +12,7 @@ class AboutDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit AboutDialog(QWidget *parent = 0);
+    explicit AboutDialog(QString version, QString type, QWidget *parent = 0);
     ~AboutDialog();
 
 public slots:

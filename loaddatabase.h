@@ -9,7 +9,7 @@ class LoadDatabase : public QWidget
 {
     Q_OBJECT
 public:
-    explicit LoadDatabase(QWidget *parent = 0);
+    explicit LoadDatabase(QString dbLocation, QWidget *parent = 0);
     void closeDatabase();
     bool returnDatabaseState();
     
@@ -20,6 +20,7 @@ signals:
 private:
     QSqlDatabase followupmain;
     bool DatabaseSate;
+    QString dbLocationPath;
     
 public slots:
     void loadDatabase();

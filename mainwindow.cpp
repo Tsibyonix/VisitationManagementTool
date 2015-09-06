@@ -5,14 +5,29 @@ MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
 {
+    QStringList pathList;
+    pathList = QStandardPaths::standardLocations(QStandardPaths::AppDataLocation);
+    envAppData = pathList.at(0);
+    patchDir = envAppData+"/patch";
+
     ui->setupUi(this);
+    init_LoadDatabase();
     setWindowTitle("Visitation Management Tool");
-    ui->tabWidget->setTabsClosable(true);
-    updates = false;
+
     qDebug() << "Loading saved settings";
     loadSettings();
     init_ConnectActions();
-    init_LoadDatabase();
+    //main
+    //getCells();
+    ui->fromDateEdit->setMaximumWidth(62);
+    ui->fromDateEdit->setInputMask("0000-00-00");
+    ui->toDateEdit->setMaximumWidth(62);
+    ui->toDateEdit->setInputMask("0000-00-00");
+    ui->searchEdit->setMaximumWidth(80);
+    //ui->cellComboBox->addItems(cells);
+
+    ui->tabWidget->setTabsClosable(true);
+    updates = false;
     patchDownload = false;
     checkForUpdate();
     //readXML();
@@ -21,7 +36,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
 MainWindow::~MainWindow()
 {
-    LoadDatabase loadDatabase;
+    LoadDatabase loadDatabase(envAppData);
     saveSettings();
     qDebug() << "Saving settings from current session";
     loadDatabase.close();
@@ -56,11 +71,12 @@ void MainWindow::init_LoadDatabase()
     qDebug() << "Loading Database";
     LoadDatabase *loadDatabse;
     loadDB = new QThread;
-    loadDatabse = new LoadDatabase;
+    loadDatabse = new LoadDatabase(envAppData, this);
     loadDatabse->moveToThread(loadDB);
     this->connect(loadDatabse, SIGNAL(error(QString)), this, SLOT(errorToStatusbar(QString)));
     this->connect(loadDB, SIGNAL(started()), loadDatabse, SLOT(loadDatabase()));
     this->connect(loadDatabse, SIGNAL(finished()), loadDB, SLOT(quit()));
+    this->connect(loadDatabse, SIGNAL(finished()), this, SLOT(slot_SetComboBox()));
     this->connect(loadDatabse, SIGNAL(finished()), loadDatabse, SLOT(deleteLater()));
     this->connect(loadDB, SIGNAL(finished()), loadDB, SLOT(deleteLater()));
     loadDB->start();
@@ -80,6 +96,7 @@ void MainWindow::init_ConnectActions()
     this->connect(ui->actionManage_Families, SIGNAL(triggered(bool)), this, SLOT(slot_ManageFamily(bool)));
     this->connect(ui->actionManage_Visits, SIGNAL(triggered(bool)), this, SLOT(slot_ManageVisit(bool)));
     this->connect(ui->actionCheck_for_Updates, SIGNAL(triggered(bool)), this, SLOT(doUpdate()));
+    this->connect(ui->actionGet_Path, SIGNAL(triggered(bool)), this, SLOT(typePath()));
     //
     this->connect(ui->tabWidget, SIGNAL(tabCloseRequested(int)), this, SLOT(closeTab(int)));
 }
@@ -92,28 +109,80 @@ void MainWindow::showMessage(QString msg, int time)
         ui->statusBar->showMessage(msg, time);
 }
 
+void MainWindow::Unzip(QString zipfilename , QString filename)
+{
+    QFile infile(zipfilename);
+    QFile outfile(filename);
+    infile.open(QIODevice::ReadOnly);
+    outfile.open(QIODevice::WriteOnly);
+    QByteArray uncompressedData = infile.readAll();
+    QByteArray compressedData = qUncompress(uncompressedData);
+    outfile.write(compressedData);
+    patchPath = QFileInfo(outfile.fileName()).absoluteFilePath();
+    patchReady = outfile.fileName();
+    infile.close();
+    outfile.close();
+}
+
+void MainWindow::slot_DoPatch()
+{
+    if(patchReady.isEmpty())
+        return;
+    else {
+        int patch = QMessageBox::warning(this,
+                                         "Continue patching",
+                                         "Pressing yes will close the application, unsubmitted data will be lost. Do you wish to continue?",
+                                         QMessageBox::Yes, QMessageBox::No);
+        if(patch == QMessageBox::Ok) {
+            showMessage(patchPath, 6000);
+            Unzip(patchPath, envAppData+"/patches/patch.exe");
+            if(QDesktopServices::openUrl(QUrl("file:///"+patchPath, QUrl::TolerantMode)))
+                MainWindow::close();
+            else{}
+        }
+        else {
+
+        }
+    }
+}
+
 void MainWindow::checkForUpdate()
 {
-    downloadFile("http://tsibyonixo.scrapmyemail.tntrg.com/visitationmanagementtool/version.xml", true);
+    downloadFile("http://tsibyonixo.scrapmyemail.tntrg.com/visitationmanagementtool/version.xml", false);
 }
 
 void MainWindow::downloadFile(QString link, bool progressDialog)
 {
+    if(progressDialog)
+        patchDownload = true;
     url.setUrl(link);
-    QFileInfo fileInfo(url.path());
 
-    QString fileName = fileInfo.fileName();
+    QString fileName = QFileInfo(url.path()).fileName();
+
     if (fileName.isEmpty())
-        fileName = "index.html";
+        fileName = "version.xml";
 
-    if (QFile::exists(fileName))
-        QFile::remove(fileName);
+    if (QFile::exists(fileName)) {
+//        if(progressDialog) {
+//            patchReady = QFileInfo(url.path()).fileName();
+//            emit signal_PatchReady();
+//            return;
+//        } else {
+            QFile::remove(fileName);
+//        }
+    }
 
-    file = new QFile(fileName);
+    //fileName = QStandardPaths::displayName(QStandardPaths::AppDataLocation);
+    file = new QFile(envAppData+"/patches/"+fileName);
     if (!file->open(QIODevice::WriteOnly)) {
         file->close();
         delete file;
     }
+
+    QFileInfo fileInfo(file->fileName());
+
+    if(progressDialog)
+        patchPath = fileInfo.absoluteFilePath();
 
     startRequest(url);
 }
@@ -149,6 +218,8 @@ void MainWindow::slot_Finished()
         if(patchDownload) {
             reply->deleteLater();
             file->close();
+            patchReady = QFileInfo(url.path()).fileName();
+            emit signal_PatchReady();
         }
         else {
             reply->deleteLater();
@@ -183,15 +254,16 @@ void MainWindow::slot_Progress(qint64 bytesRead, qint64 totalBytes)
                     .arg(QString::number(speed))
                     .arg(QString::number(time, 'f', 1))
                     .arg(format), NULL);
-    else
-        showMessage("File Downloaded", 6000);
+    else {
+       showMessage("File Downloaded", 6000);
+    }
 }
 
 void MainWindow::readXML()
 {
     qDebug() << "Parsing document";
     QDomDocument document;
-    QFile xml("version.xml");
+    QFile xml(envAppData+"/patches/version.xml");
     if(!xml.open(QIODevice::ReadOnly))
         qDebug() << "Cannot open file";
     if(!document.setContent(&xml)) {
@@ -243,7 +315,7 @@ void MainWindow::doUpdate()
 
 void MainWindow::aboutAction(bool val)
 {
-    AboutDialog aboutDialog(this);
+    AboutDialog aboutDialog(version, status, this);
     aboutDialog.setModal(val);
     aboutDialog.exec();
 }
@@ -285,9 +357,10 @@ void MainWindow::slot_runQueryAction(bool val)
 void MainWindow::getCells()
 {
     cells.clear();
+    cells << "ALL";
     QSqlQuery qry("select cell from cell_id");
     if(!qry.exec())
-        showMessage("Cannot get cell list", 6000);
+        showMessage("Cannot get cell list, "+qry.lastError().text(), 6000);
     else
     {
         while(qry.next())
@@ -297,12 +370,23 @@ void MainWindow::getCells()
     }
 }
 
+void MainWindow::slot_SetComboBox()
+{
+    getCells();
+    ui->cellComboBox->addItems(cells);
+}
+
 void MainWindow::closeTab(int index)
 {
     if(index == 0)
         showMessage("Cannot close main tab.", 6000);
     else
         ui->tabWidget->removeTab(index);
+}
+
+void MainWindow::setMainTable()
+{
+
 }
 
 void MainWindow::manageCell_RefreshTable()

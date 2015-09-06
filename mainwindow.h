@@ -36,6 +36,11 @@
 #include <QFileInfo>
 #include <QFile>
 #include <QtXml>
+#include <QDesktopServices>
+
+//Windows
+#include <QProcessEnvironment>
+#include <QStandardPaths>
 
 #include "loaddatabase.h"
 #include "aboutdialog.h"
@@ -58,7 +63,7 @@ private:
     Ui::MainWindow *ui;
 
     QString status = "beta";
-    QString version = "0.1";
+    QString version = "0.2";
 
     //init
     void init_ConnectActions();
@@ -80,6 +85,10 @@ private:
     //data function
     void getCells();
     QStringList cells;
+
+    //main table
+    void setMainTable();
+    QString mainQuery;
 
     //management ManageCell cell_id
     //QSqlTableModel manageCell_SetupTable();
@@ -119,6 +128,8 @@ private:
     QFile *file;
     bool patchDownload;
     bool updates;
+    QString patchReady;
+    QString patchPath;
 
     QDomElement stable;
     QDomElement linkstable;
@@ -127,9 +138,13 @@ private:
 
     void checkForUpdate();
     void readXML();
+    void Unzip(QString zipfilename , QString filename);
 
     qint64 speed = 0;
     qint64 last = 0;
+
+    QString envAppData;
+    QString patchDir;
 
 private slots:
     //mangement
@@ -154,6 +169,10 @@ private slots:
     void slot_Finished();
     void slot_Progress(qint64 bytesRead, qint64 totalBytes);
 
+    void slot_DoPatch();
+
+    void slot_SetComboBox();
+
 public slots:
     void errorToStatusbar(QString err);
 
@@ -169,6 +188,7 @@ protected:
 
 signals:
     void linkReceived(QString link);
+    void signal_PatchReady();
 };
 
 #endif // MAINWINDOW_H

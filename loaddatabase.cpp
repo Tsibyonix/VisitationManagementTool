@@ -1,14 +1,15 @@
 #include "loaddatabase.h"
 
-LoadDatabase::LoadDatabase(QWidget *parent) :
+LoadDatabase::LoadDatabase(QString dbLocation, QWidget *parent) :
     QWidget(parent)
 {
+    dbLocationPath = dbLocation;
 }
 
 void LoadDatabase::loadDatabase()
 {
     followupmain = QSqlDatabase::addDatabase("QSQLITE");
-    followupmain.setDatabaseName("followupmain.db3");
+    followupmain.setDatabaseName(dbLocationPath+"/followupmain.db3");
     followupmain.open();
     if(followupmain.isOpen()) {
         DatabaseSate = 0;

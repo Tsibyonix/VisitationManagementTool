@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>448</width>
-    <height>131</height>
+    <height>146</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,7 +19,7 @@
      <x>10</x>
      <y>10</y>
      <width>431</width>
-     <height>111</height>
+     <height>124</height>
     </rect>
    </property>
    <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -28,7 +28,14 @@
       <item>
        <widget class="QLabel" name="label">
         <property name="text">
-         <string>Visitation Management Tool, version 0.1 beta, lisenced under MIT license.</string>
+         <string>Visitation Management Tool, lisenced under MIT license.</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="version">
+        <property name="text">
+         <string>TextLabel</string>
         </property>
        </widget>
       </item>
