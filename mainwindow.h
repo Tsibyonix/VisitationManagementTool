@@ -87,7 +87,7 @@ private:
     QStringList cells;
 
     //main table
-    void setMainTable();
+    void setMainTable(QString family, QString cell);
     QString mainQuery;
 
     //management ManageCell cell_id
@@ -171,7 +171,12 @@ private slots:
 
     void slot_DoPatch();
 
-    void slot_SetComboBox();
+    void slot_SetCellComboBox();
+    void slot_FamilyComboBoxSelectionChanged(int index);
+    void slot_CellComboBoxSelectionChanged(int index);
+
+    void slot_TabIndexChanged(int index);
+
 
 public slots:
     void errorToStatusbar(QString err);

@@ -76,7 +76,7 @@ void MainWindow::init_LoadDatabase()
     this->connect(loadDatabse, SIGNAL(error(QString)), this, SLOT(errorToStatusbar(QString)));
     this->connect(loadDB, SIGNAL(started()), loadDatabse, SLOT(loadDatabase()));
     this->connect(loadDatabse, SIGNAL(finished()), loadDB, SLOT(quit()));
-    this->connect(loadDatabse, SIGNAL(finished()), this, SLOT(slot_SetComboBox()));
+    this->connect(loadDatabse, SIGNAL(finished()), this, SLOT(slot_SetCellComboBox()));
     this->connect(loadDatabse, SIGNAL(finished()), loadDatabse, SLOT(deleteLater()));
     this->connect(loadDB, SIGNAL(finished()), loadDB, SLOT(deleteLater()));
     loadDB->start();
@@ -99,6 +99,10 @@ void MainWindow::init_ConnectActions()
     this->connect(ui->actionGet_Path, SIGNAL(triggered(bool)), this, SLOT(typePath()));
     //
     this->connect(ui->tabWidget, SIGNAL(tabCloseRequested(int)), this, SLOT(closeTab(int)));
+    this->connect(ui->familyComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(slot_FamilyComboBoxSelectionChanged(int)));
+    this->connect(ui->cellComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(slot_CellComboBoxSelectionChanged(int)));
+    this->connect(ui->tabWidget, SIGNAL(currentChanged(int)), this, SLOT(slot_TabIndexChanged(int)));
+
 }
 
 void MainWindow::showMessage(QString msg, int time)
@@ -370,7 +374,7 @@ void MainWindow::getCells()
     }
 }
 
-void MainWindow::slot_SetComboBox()
+void MainWindow::slot_SetCellComboBox()
 {
     getCells();
     ui->cellComboBox->addItems(cells);
@@ -384,9 +388,74 @@ void MainWindow::closeTab(int index)
         ui->tabWidget->removeTab(index);
 }
 
-void MainWindow::setMainTable()
+void MainWindow::slot_CellComboBoxSelectionChanged(int index)
 {
+    QString cell = ui->cellComboBox->currentText();
+    setMainTable(ui->familyComboBox->currentText(), cell);
+}
 
+void MainWindow::slot_FamilyComboBoxSelectionChanged(int index)
+{
+    QString family = ui->familyComboBox->currentText();
+    setMainTable(family, ui->cellComboBox->currentText());
+}
+
+void MainWindow::setMainTable(QString family, QString cell)
+{
+    mainQuery.clear();
+    if(QString::compare(cell, "ALL") == 0) {
+        mainQuery = "select family_id.family, visit.visit_by, visit.date, visit.comments from family_id ";
+        if(family.compare("All Families")) {
+            mainQuery.append(", visit on family_id.family = visit.visit_to");
+        }
+        else
+            mainQuery.append("left outer join visit on family_id.family = visit.visit_to");
+    }
+    else {
+        mainQuery = "select family_id.family, visit.visit_by, visit.date, visit.comments from family_id ";
+        if(family.compare("All Families")) {
+            mainQuery.append(", visit on family_id.family = visit.visit_to where family_id.id in ( select id from cell_id where cell = '"+ cell +"');");
+        }
+        else
+            mainQuery.append("left outer join visit on family_id.family = visit.visit_to where family_id.id in ( select id from cell_id where cell = '"+ cell +"');");
+    }
+
+    QSqlQueryModel *model;
+    model = new QSqlQueryModel;
+    QSqlQuery query;
+    query.prepare(mainQuery);
+
+    if(!query.exec())
+        showMessage(query.lastError().text(), 6000);
+
+    else
+    {
+        model->setQuery(query);
+        ui->mainTableView->setModel(model);
+    }
+}
+
+void MainWindow::slot_TabIndexChanged(int index)
+{
+    ui->show->show();
+    ui->familyComboBox->show();
+    ui->from->show();
+    ui->cellComboBox->show();
+    ui->in->show();
+    ui->fromDateEdit->show();
+    ui->toDateEdit->show();
+    ui->to->show();
+
+    if(index != 0) {
+        ui->show->hide();
+        ui->familyComboBox->hide();
+        ui->from->hide();
+        ui->cellComboBox->hide();
+        ui->in->hide();
+        ui->fromDateEdit->hide();
+        ui->toDateEdit->hide();\
+        ui->to->hide();
+    }
 }
 
 void MainWindow::manageCell_RefreshTable()
@@ -477,6 +546,7 @@ void MainWindow::slot_ManageCell_SubmitButton(bool val)
     {
         manageCell_Model->database().commit();
         qDebug() << "Changes are commited";
+        slot_SetCellComboBox();
     }
     else
     {
