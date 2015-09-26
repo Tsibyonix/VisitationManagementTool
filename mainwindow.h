@@ -87,7 +87,7 @@ private:
     QStringList cells;
 
     //main table
-    void setMainTable(QString family, QString cell);
+    void setMainTable(QString family, QString cell, QString view);
     QString mainQuery;
 
     //management ManageCell cell_id
@@ -104,6 +104,8 @@ private:
 
     //cell views
     void setupCellView();
+    void deleteView();
+    QStringList deleteCellList;
 
     //management ManageFamilies family_id
     QSqlRelationalTableModel *manageFamily_Model;
@@ -155,6 +157,7 @@ private slots:
     void slot_ManageCells_AddButtonPress(bool val);
     void slot_ManageCells_DelButtonPress(bool val);
     void slot_ManageCell_SubmitButton(bool val);
+    void slot_ManageCells_RevertButton(bool val);
 
     void slot_ManageFamily(bool val);
     void slot_ManageFamily_AddButton(bool val);
@@ -177,6 +180,7 @@ private slots:
     void slot_SetCellComboBox();
     void slot_FamilyComboBoxSelectionChanged(int index);
     void slot_CellComboBoxSelectionChanged(int index);
+    void slot_FortniteComboBoxSelectionChanged(int index);
 
     void slot_TabIndexChanged(int index);
 

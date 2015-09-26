@@ -106,6 +106,7 @@ void MainWindow::init_ConnectActions()
     this->connect(ui->tabWidget, SIGNAL(tabCloseRequested(int)), this, SLOT(closeTab(int)));
     this->connect(ui->familyComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(slot_FamilyComboBoxSelectionChanged(int)));
     this->connect(ui->cellComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(slot_CellComboBoxSelectionChanged(int)));
+    this->connect(ui->fortnite, SIGNAL(currentIndexChanged(int)), this, SLOT(slot_FortniteComboBoxSelectionChanged(int)));
     this->connect(ui->tabWidget, SIGNAL(currentChanged(int)), this, SLOT(slot_TabIndexChanged(int)));
     this->connect(this, SIGNAL(signal_PatchReady()), this, SLOT(slot_DoPatch()));
 }
@@ -397,11 +398,35 @@ void MainWindow::setupCellView()
         QString cell = cells.at(counter);
         cell.replace(" ", "_");
         cell.append("_visit");
-        showMessage(cell, 6000);
         QSqlQuery qry;
-        qry.prepare("create view '"+cell+"' as select visit.visit_to, visit.visit_by, visit.date, visit.comments from family_id left outer join visit on family_id.family = visit.visit_to where family_id.id in (select id from cell_id where cell = '"+cells.at(counter)+"')");
+        qry.prepare("create view '"+cell+"' "
+                    "as "
+                    "select family_id.family as visit_to, visit.visit_by, visit.date, visit.comments "
+                    "from family_id left outer join visit on "
+                    "family_id.family = visit.visit_to where family_id.id "
+                    "in "
+                    "(select id from cell_id where cell = '"+cells.at(counter)+"')");
         qry.exec();
     }
+}
+
+void MainWindow::deleteView()
+{
+    qDebug() << "deleteing views";
+    int counter;
+    int length = deleteCellList.length();
+    for(counter = 0; counter < length; counter++)
+    {
+        QString cellTemp;
+        cellTemp = deleteCellList.at(counter);
+        cellTemp.replace(" ", "_");
+        cellTemp.append("_visit");
+        QSqlQuery delQry;
+        delQry.prepare("drop view '"+cellTemp+"'");
+        delQry.exec();
+    }
+    deleteCellList.clear();
+    qDebug() << "view deleted";
 }
 
 void MainWindow::setupViews()
@@ -414,52 +439,84 @@ void MainWindow::closeTab(int index)
     if(index == 0)
         showMessage("Cannot close main tab.", 6000);
     else
+    {
+        QString tabName;
+        tabName = ui->tabWidget->tabText(index);
+        if(QString::compare(tabName, "Cell Management") == 0) {
+            qDebug() << "Clearing delete cache";
+            deleteCellList.clear();
+        }
         ui->tabWidget->removeTab(index);
+    }
 }
 
 void MainWindow::slot_CellComboBoxSelectionChanged(int index)
 {
     QString cell = ui->cellComboBox->currentText();
-    setMainTable(ui->familyComboBox->currentText(), cell);
+    setMainTable(ui->familyComboBox->currentText(), cell, ui->fortnite->currentText());
 }
 
 void MainWindow::slot_FamilyComboBoxSelectionChanged(int index)
 {
     QString family = ui->familyComboBox->currentText();
-    setMainTable(family, ui->cellComboBox->currentText());
+    setMainTable(family, ui->cellComboBox->currentText(), ui->fortnite->currentText());
 }
 
-void MainWindow::setMainTable(QString family, QString cell)
+void MainWindow::slot_FortniteComboBoxSelectionChanged(int index)
+{
+    QString view = ui->fortnite->currentText();
+    setMainTable(NULL, ui->cellComboBox->currentText(), view);
+}
+
+void MainWindow::setMainTable(QString family, QString cell, QString view)
 {
     mainQuery.clear();
-    if(QString::compare(cell, "ALL") == 0) {
-        mainQuery = "select family_id.family, visit.visit_by, visit.date, visit.comments from family_id ";
-        if(family.compare("All Families")) {
-            mainQuery.append(", visit on family_id.family = visit.visit_to");
+    if(QString::compare(view, "Fortnite 1/ Fortnite 2") == 0)
+    {
+        if(QString::compare(cell, "ALL") == 0) {
+            mainQuery.append("select"
+                             " visit_to,"
+                             " replace(rtrim(group_concat((case when date(date(date, '-15 days'), 'start of month') <> date(date, 'start of month') then visit_by else '' end), (case when date(date(date, '-15 days'), 'start of month') <> date(date, 'start of month') then ' ' else '' end))), ' ', ',') fortnite1,"
+                             " replace(rtrim(group_concat((case when date(date(date, '-15 days'), 'start of month') = date(date, 'start of month') then visit_by else '' end), (case when date(date(date, '-15 days'), 'start of month') = date(date, 'start of month') then ' ' else '' end))), ' ', ',') fortnite2"
+                             " from visit"
+                             " group by visit_to, date(date, 'start of month')");
+        } else {
+            QString cellTemp = cell;
+            cellTemp.replace(" ", "_");
+            cellTemp.append("_visit");
+             //where date >= date('2015-09-01') and date <= date('2015-10-01')
+            mainQuery.append("select"
+                             " visit_to,"
+                             " replace(rtrim(group_concat((case when date(date(date, '-15 days'), 'start of month') <> date(date, 'start of month') then visit_by else '' end), (case when date(date(date, '-15 days'), 'start of month') <> date(date, 'start of month') then ' ' else '' end))), ' ', ',') fortnite1,"
+                             " replace(rtrim(group_concat((case when date(date(date, '-15 days'), 'start of month') = date(date, 'start of month') then visit_by else '' end), (case when date(date(date, '-15 days'), 'start of month') = date(date, 'start of month') then ' ' else '' end))), ' ', ',') fortnite2"
+                             " from '"+cellTemp+"'"
+                             " group by visit_to, date(date, 'start of month')");
         }
-        else
-            mainQuery.append("left outer join visit on family_id.family = visit.visit_to");
     }
-    else {
-        mainQuery = "select family_id.family, visit.visit_by, visit.date, visit.comments from family_id ";
-        if(family.compare("All Families")) {
-            mainQuery.append(", visit on family_id.family = visit.visit_to where family_id.id in ( select id from cell_id where cell = '"+ cell +"');");
+    else
+    {
+        if(QString::compare(cell, "ALL") == 0) {
+            mainQuery = "select family_id.family, visit.visit_by, visit.date, visit.comments from family_id ";
+            if(family.compare("All Families")) {
+                mainQuery.append(", visit on family_id.family = visit.visit_to");
+            }
+            else
+                mainQuery.append("left outer join visit on family_id.family = visit.visit_to");
         }
-        else
-            mainQuery.append("left outer join visit on family_id.family = visit.visit_to where family_id.id in ( select id from cell_id where cell = '"+ cell +"');");
+        else {
+            mainQuery = "select family_id.family, visit.visit_by, visit.date, visit.comments from family_id ";
+            if(family.compare("All Families")) {
+                mainQuery.append(", visit on family_id.family = visit.visit_to where family_id.id in ( select id from cell_id where cell = '"+ cell +"');");
+            }
+            else
+                mainQuery.append("left outer join visit on family_id.family = visit.visit_to where family_id.id in ( select id from cell_id where cell = '"+ cell +"');");
+        }
     }
 
     QSqlQueryModel *model;
     model = new QSqlQueryModel;
     QSqlQuery query;
-    //query.prepare(mainQuery);
-    query.prepare("select"
-                  " visit_to,"
-                  " replace(rtrim(group_concat((case when date(date(date, '-15 days'), 'start of month') <> date(date, 'start of month') then visit_by else '' end), (case when date(date(date, '-15 days'), 'start of month') <> date(date, 'start of month') then ' ' else '' end))), ' ', ',') fortnite1,"
-                  " replace(rtrim(group_concat((case when date(date(date, '-15 days'), 'start of month') = date(date, 'start of month') then visit_by else '' end), (case when date(date(date, '-15 days'), 'start of month') = date(date, 'start of month') then ' ' else '' end))), ' ', ',') fortnite2"
-                  " from cell_2_visit"
-                  " group by visit_to, date(date, 'start of month')");
-
+    query.prepare(mainQuery);
     if(!query.exec())
         showMessage(query.lastError().text(), 6000);
 
@@ -536,7 +593,7 @@ void MainWindow::slot_ManageCells(bool val)
     this->connect(addButton, SIGNAL(clicked(bool)), this, SLOT(slot_ManageCells_AddButtonPress(bool)));
     this->connect(deleteButton, SIGNAL(clicked(bool)), this, SLOT(slot_ManageCells_DelButtonPress(bool)));
     this->connect(manageCell_SubmitButton, SIGNAL(clicked(bool)), this, SLOT(slot_ManageCell_SubmitButton(bool)));
-    this->connect(manageCell_RevertButton, SIGNAL(clicked(bool)), manageCell_Model, SLOT(revertAll()));
+    this->connect(manageCell_RevertButton, SIGNAL(clicked(bool)), this, SLOT(slot_ManageCells_RevertButton(bool)));
 }
 
 void MainWindow::slot_ManageCells_AddButtonPress(bool val)
@@ -557,12 +614,13 @@ void MainWindow::slot_ManageCells_DelButtonPress(bool val)
 {
     QModelIndex index;
     int row = -1;
+    int column = 0;
     index = cellTable->currentIndex();
     row = index.row();
     if(index.isValid())
     {
         showMessage("Deleting row number "+QString::number(row + 1)+"", 6000);
-        QString temp = index.sibling(row, 1).data().toString();
+        deleteCellList << index.sibling(row, column).data().toString();
         manageCell_Model->removeRow(index.row());
         manageCell_Model->submit();
     }
@@ -579,14 +637,25 @@ void MainWindow::slot_ManageCell_SubmitButton(bool val)
         manageCell_Model->database().commit();
         qDebug() << "Changes are commited";
         slot_SetCellComboBox();
+        if(!deleteCellList.isEmpty()){
+            deleteView();
+        }
     }
     else
     {
+        deleteCellList.clear();
         qDebug() << "Rollback";
         manageCell_Model->database().rollback();
         QMessageBox::warning(this, "Edit Error",
                              manageCell_Model->lastError().text());
     }
+}
+
+void MainWindow::slot_ManageCells_RevertButton(bool val)
+{
+    manageCell_Model->revertAll();
+    qDebug() << "Clearing delete cache";
+    deleteCellList.clear();
 }
 
 void MainWindow::manageFamily_RefreshTable()
