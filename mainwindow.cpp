@@ -19,10 +19,15 @@ MainWindow::MainWindow(QWidget *parent) :
     init_ConnectActions();
     //main
     //getCells();
-    ui->fromDateEdit->setMaximumWidth(62);
-    ui->fromDateEdit->setInputMask("0000-00-00");
-    ui->toDateEdit->setMaximumWidth(62);
-    ui->toDateEdit->setInputMask("0000-00-00");
+//    ui->fromDateEdit->setMaximumWidth(62);
+//    ui->fromDateEdit->setInputMask("0000-00-00");
+//    ui->toDateEdit->setMaximumWidth(62);
+//    ui->toDateEdit->setInputMask("0000-00-00");
+    QStringList month;
+    month << "January" << "February" << "March" << "April" << "May" << "June" << "July" << "August" << "September" << "October" << "November" << "December";
+    QStringList fortnite;
+    fortnite << "This Month" << "Fortnite 1/ Fortnite 2";
+    ui->fortnite->addItems(fortnite);
     ui->searchEdit->setMaximumWidth(80);
     //ui->cellComboBox->addItems(cells);
 
@@ -96,13 +101,13 @@ void MainWindow::init_ConnectActions()
     this->connect(ui->actionManage_Families, SIGNAL(triggered(bool)), this, SLOT(slot_ManageFamily(bool)));
     this->connect(ui->actionManage_Visits, SIGNAL(triggered(bool)), this, SLOT(slot_ManageVisit(bool)));
     this->connect(ui->actionCheck_for_Updates, SIGNAL(triggered(bool)), this, SLOT(doUpdate()));
-    this->connect(ui->actionGet_Path, SIGNAL(triggered(bool)), this, SLOT(typePath()));
+    this->connect(ui->actionSetup_Views, SIGNAL(triggered(bool)), this, SLOT(setupViews()));
     //
     this->connect(ui->tabWidget, SIGNAL(tabCloseRequested(int)), this, SLOT(closeTab(int)));
     this->connect(ui->familyComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(slot_FamilyComboBoxSelectionChanged(int)));
     this->connect(ui->cellComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(slot_CellComboBoxSelectionChanged(int)));
     this->connect(ui->tabWidget, SIGNAL(currentChanged(int)), this, SLOT(slot_TabIndexChanged(int)));
-
+    this->connect(this, SIGNAL(signal_PatchReady()), this, SLOT(slot_DoPatch()));
 }
 
 void MainWindow::showMessage(QString msg, int time)
@@ -137,15 +142,17 @@ void MainWindow::slot_DoPatch()
                                          "Continue patching",
                                          "Pressing yes will close the application, unsubmitted data will be lost. Do you wish to continue?",
                                          QMessageBox::Yes, QMessageBox::No);
-        if(patch == QMessageBox::Ok) {
+        if(patch == QMessageBox::Yes) {
             showMessage(patchPath, 6000);
             Unzip(patchPath, envAppData+"/patches/patch.exe");
             if(QDesktopServices::openUrl(QUrl("file:///"+patchPath, QUrl::TolerantMode)))
                 MainWindow::close();
-            else{}
+            else{
+                showMessage("Cannot open file", 6000);
+            }
         }
         else {
-
+            showMessage("You can alway came back and update later", 6000);
         }
     }
 }
@@ -361,6 +368,7 @@ void MainWindow::slot_runQueryAction(bool val)
 void MainWindow::getCells()
 {
     cells.clear();
+    ui->cellComboBox->clear();
     cells << "ALL";
     QSqlQuery qry("select cell from cell_id");
     if(!qry.exec())
@@ -378,6 +386,27 @@ void MainWindow::slot_SetCellComboBox()
 {
     getCells();
     ui->cellComboBox->addItems(cells);
+    setupCellView();
+}
+
+void MainWindow::setupCellView()
+{
+    int counter =1;
+    for(counter =1; counter <= cells.length() -1; counter++)
+    {
+        QString cell = cells.at(counter);
+        cell.replace(" ", "_");
+        cell.append("_visit");
+        showMessage(cell, 6000);
+        QSqlQuery qry;
+        qry.prepare("create view '"+cell+"' as select visit.visit_to, visit.visit_by, visit.date, visit.comments from family_id left outer join visit on family_id.family = visit.visit_to where family_id.id in (select id from cell_id where cell = '"+cells.at(counter)+"')");
+        qry.exec();
+    }
+}
+
+void MainWindow::setupViews()
+{
+    setupCellView();
 }
 
 void MainWindow::closeTab(int index)
@@ -423,7 +452,13 @@ void MainWindow::setMainTable(QString family, QString cell)
     QSqlQueryModel *model;
     model = new QSqlQueryModel;
     QSqlQuery query;
-    query.prepare(mainQuery);
+    //query.prepare(mainQuery);
+    query.prepare("select"
+                  " visit_to,"
+                  " replace(rtrim(group_concat((case when date(date(date, '-15 days'), 'start of month') <> date(date, 'start of month') then visit_by else '' end), (case when date(date(date, '-15 days'), 'start of month') <> date(date, 'start of month') then ' ' else '' end))), ' ', ',') fortnite1,"
+                  " replace(rtrim(group_concat((case when date(date(date, '-15 days'), 'start of month') = date(date, 'start of month') then visit_by else '' end), (case when date(date(date, '-15 days'), 'start of month') = date(date, 'start of month') then ' ' else '' end))), ' ', ',') fortnite2"
+                  " from cell_2_visit"
+                  " group by visit_to, date(date, 'start of month')");
 
     if(!query.exec())
         showMessage(query.lastError().text(), 6000);
@@ -439,22 +474,18 @@ void MainWindow::slot_TabIndexChanged(int index)
 {
     ui->show->show();
     ui->familyComboBox->show();
-    ui->from->show();
+    ui->inThis->show();
     ui->cellComboBox->show();
     ui->in->show();
-    ui->fromDateEdit->show();
-    ui->toDateEdit->show();
-    ui->to->show();
+    ui->fortnite->show();
 
     if(index != 0) {
         ui->show->hide();
         ui->familyComboBox->hide();
-        ui->from->hide();
+        ui->inThis->hide();
         ui->cellComboBox->hide();
         ui->in->hide();
-        ui->fromDateEdit->hide();
-        ui->toDateEdit->hide();\
-        ui->to->hide();
+        ui->fortnite->hide();
     }
 }
 
@@ -519,6 +550,7 @@ void MainWindow::slot_ManageCells_AddButtonPress(bool val)
     sqlRecord.append(cell);
     sqlRecord.append(id);
     manageCell_Model->insertRecord(-1, sqlRecord);
+
 }
 
 void MainWindow::slot_ManageCells_DelButtonPress(bool val)

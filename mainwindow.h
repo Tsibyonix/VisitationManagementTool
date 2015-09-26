@@ -63,7 +63,7 @@ private:
     Ui::MainWindow *ui;
 
     QString status = "beta";
-    QString version = "0.2";
+    QString version = "0.1";
 
     //init
     void init_ConnectActions();
@@ -101,6 +101,9 @@ private:
     QPushButton *deleteButton;
     QPushButton *manageCell_SubmitButton;
     QPushButton *manageCell_RevertButton;
+
+    //cell views
+    void setupCellView();
 
     //management ManageFamilies family_id
     QSqlRelationalTableModel *manageFamily_Model;
@@ -184,6 +187,7 @@ public slots:
     //actions
     void aboutAction(bool val);
     void doUpdate();
+    void setupViews();
 
     //
     void closeTab(int index);

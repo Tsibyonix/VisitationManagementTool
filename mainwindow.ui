@@ -62,38 +62,14 @@
        </widget>
       </item>
       <item>
-       <widget class="QLabel" name="from">
+       <widget class="QLabel" name="inThis">
         <property name="text">
-         <string>from</string>
+         <string>in this</string>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QLineEdit" name="fromDateEdit">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLabel" name="to">
-        <property name="text">
-         <string>to</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLineEdit" name="toDateEdit">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-       </widget>
+       <widget class="QComboBox" name="fortnite"/>
       </item>
       <item>
        <spacer name="horizontalSpacer">
@@ -178,6 +154,7 @@
      <string>&amp;File</string>
     </property>
     <addaction name="actionRun_Query"/>
+    <addaction name="actionSetup_Views"/>
    </widget>
    <widget class="QMenu" name="menu_Help">
     <property name="title">
@@ -243,6 +220,11 @@
   <action name="actionGet_Path">
    <property name="text">
     <string>Get Path</string>
+   </property>
+  </action>
+  <action name="actionSetup_Views">
+   <property name="text">
+    <string>Setup Views</string>
    </property>
   </action>
  </widget>
